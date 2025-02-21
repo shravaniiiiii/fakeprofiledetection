@@ -29,88 +29,119 @@ global model
 
 
 def loadProfileDataset():    
-    global filename
-    global dataset
+    global filename, dataset
     outputarea.delete('1.0', END)
     filename = filedialog.askopenfilename(initialdir="Dataset")
-    outputarea.insert(END,filename+" loaded\n\n")
-    dataset = pd.read_csv(filename)
-    outputarea.insert(END,str(dataset.head()))
+    outputarea.insert(END, filename + " loaded\n\n")
     
-def preprocessDataset():
-    global X, Y
-    global dataset
-    global X_train, X_test, y_train, y_test
-    outputarea.delete('1.0', END)
-    X = dataset.values[:, 0:8] 
-    Y = dataset.values[:, 8]
-    indices = np.arange(X.shape[0])
-    np.random.shuffle(indices)
-    X = X[indices]
-    Y = Y[indices]
-    Y = to_categorical(Y)
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
+    try:
+        dataset = pd.read_csv(filename)
+        outputarea.insert(END, "Dataset Loaded Successfully!\n\n")
+        outputarea.insert(END, str(dataset.head()) + "\n\n")
+        print(dataset.info())  # Debugging: Print dataset structure in terminal
+    except Exception as e:
+        outputarea.insert(END, "Error Loading Dataset: " + str(e) + "\n\n")
+        print("Error:", e)
 
-    outputarea.insert(END,"\n\nDataset contains total profiles : "+str(len(X))+"\n")
-    outputarea.insert(END,"Total profiles used to train ML algorithm : "+str(len(X_train))+"\n")
-    outputarea.insert(END,"Total profiles used to test ML algorithm  : "+str(len(X_test))+"\n")
+def preprocessDataset():
+    global X, Y, dataset, X_train, X_test, y_train, y_test
+    outputarea.delete('1.0', END)
+
+    try:
+        X = dataset.iloc[:, 0:8].values  # Use .iloc to avoid issues
+        Y = dataset.iloc[:, 8].values  
+        
+        indices = np.arange(X.shape[0])
+        np.random.shuffle(indices)
+        X, Y = X[indices], Y[indices]
+        
+        Y = to_categorical(Y, num_classes=2)  # Ensure Y is one-hot encoded properly
+
+        X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
+
+        outputarea.insert(END, f"Dataset contains total profiles: {len(X)}\n")
+        outputarea.insert(END, f"Training Profiles: {len(X_train)}\n")
+        outputarea.insert(END, f"Testing Profiles: {len(X_test)}\n")
+        print(f"X_train Shape: {X_train.shape}, Y_train Shape: {y_train.shape}")  # Debugging
+    except Exception as e:
+        outputarea.insert(END, "Error in Preprocessing: " + str(e) + "\n\n")
+        print("Preprocessing Error:", e)
 
 def executeANN():
-    global model
+    global model, accuracy, X_train, X_test, y_train, y_test
     outputarea.delete('1.0', END)
-    global X_train, X_test, y_train, y_test
-    global accuracy
 
-    model = Sequential()
-    model.add(Dense(200, input_shape=(8,), activation='relu', name='fc1'))
-    model.add(Dense(200, activation='relu', name='fc2'))
-    model.add(Dense(2, activation='softmax', name='output'))
-    optimizer = Adam(lr=0.001)
-    model.compile(optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-    print('ANN Neural Network Model Summary: ')
-    print(model.summary())
-    hist = model.fit(X_train, y_train, verbose=2, batch_size=5, epochs=200)
-    results = model.evaluate(X_test, y_test)
-    ann_acc = results[1] * 100
-    print(ann_acc)
-    accuracy = hist.history
-    acc = accuracy['accuracy']
-    acc = acc[199] * 100
-    outputarea.insert(END,"ML model generated and its prediction accuracy is : "+str(acc)+"\n")
+    try:
+        model = Sequential([
+            Dense(200, input_shape=(8,), activation='relu'),
+            Dense(200, activation='relu'),
+            Dense(2, activation='softmax')  # Ensure 2 output neurons
+        ])
+        
+        model.compile(optimizer=Adam(learning_rate=0.001),
+                      loss='categorical_crossentropy',
+                      metrics=['accuracy'])
+
+        print("ANN Model Summary:")
+        model.summary()  # Debugging
+
+        hist = model.fit(X_train, y_train, batch_size=5, epochs=200, verbose=2)
+
+        results = model.evaluate(X_test, y_test)
+        accuracy = hist.history
+        acc = accuracy['accuracy'][-1] * 100  # Get last epoch accuracy
+
+        outputarea.insert(END, f"Model Trained! Accuracy: {acc:.2f}%\n")
+        print("Model Training Completed Successfully!")
+
+    except Exception as e:
+        outputarea.insert(END, "Error in Training: " + str(e) + "\n\n")
+        print("Training Error:", e)
 
     
 def graph():
     global accuracy
-    acc = accuracy['accuracy']
-    loss = accuracy['loss']
+    if not accuracy:
+        outputarea.insert(END, "Error: No accuracy data available!\n")
+        return
 
-    
-    plt.figure(figsize=(10,6))
-    plt.grid(True)
-    plt.xlabel('Iterations')
-    plt.ylabel('Accuracy/Loss')
-    plt.plot(acc, 'ro-', color = 'green')
-    plt.plot(loss, 'ro-', color = 'blue')
-    plt.legend(['Accuracy', 'Loss'], loc='upper left')
-    #plt.xticks(wordloss.index)
-    plt.title('ML Iteration Wise Accuracy & Loss Graph')
-    plt.show()
+    try:
+        acc = accuracy['accuracy']
+        loss = accuracy['loss']
+
+        plt.figure(figsize=(10, 6))
+        plt.grid(True)
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy/Loss')
+        plt.plot(acc, 'g-', label="Accuracy")
+        plt.plot(loss, 'b-', label="Loss")
+        plt.legend(loc='upper left')
+        plt.title('ML Accuracy & Loss Graph')
+        plt.show()
+    except Exception as e:
+        outputarea.insert(END, "Graph Error: " + str(e) + "\n\n")
+        print("Graph Error:", e)
+
 
 def predictProfile():
     outputarea.delete('1.0', END)
     global model
-    filename = filedialog.askopenfilename(initialdir="Dataset")
-    test = pd.read_csv(filename)
-    test = test.values[:, 0:8]
-    predict = model.predict_classes(test)
-    print(predict)
-    for i in range(len(test)):
-        msg = ''
-        if str(predict[i]) == '0':
-            msg = "Given Account Details Predicted As Genuine"
-        if str(predict[i]) == '1':
-            msg = "Given Account Details Predicted As DUPLICATION "
-        outputarea.insert(END,str(test[i])+" "+msg+"\n\n")    
+
+    try:
+        filename = filedialog.askopenfilename(initialdir="Dataset")
+        test = pd.read_csv(filename).iloc[:, 0:8].values  # Ensure correct shape
+        
+        predictions = model.predict(test)
+        predicted_classes = np.argmax(predictions, axis=1)  # Convert softmax output to class
+
+        for i in range(len(test)):
+            msg = "Genuine" if predicted_classes[i] == 0 else "Duplicated"
+            outputarea.insert(END, f"Profile {i+1}: {msg}\n")
+
+    except Exception as e:
+        outputarea.insert(END, "Prediction Error: " + str(e) + "\n\n")
+        print("Prediction Error:", e)
+  
         
 def close():
     main.destroy()
