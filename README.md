@@ -17,7 +17,16 @@ Fake-Profile-Detection/
 │── Main.py                     # Flask application
 │── README.md                   # Project documentation
 ```
-
+## Installing modules
+ ```bash
+pip install tensorflow keras pandas numpy scikit-learn flask
+ ```
+```bash
+pip install nltk matplotlib seaborn
+```
+```bash
+pip install tensorflow
+```
 ## 🎯 Features
 ✅ **Analyzes profile attributes and behavior**  
 ✅ **Detects fake profiles using ML classifiers**  
